@@ -1,0 +1,58 @@
+HELP.md
+target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+
+### Environment & Local Workspaces ###
+.env
+.env.local
+workspaces/
+temp-repos/
+logs/
+*.log
+
+### Agent Governance, Documentation & Workspaces (Ignored from remote) ###
+decision.md
+flow.md
+handsoff.md
+quiz.md
+roadmap.md
+deliverables/
+deliverables
+.gemini/
+.gemini
+.agents/
+.agents
+.codex/
+.codex
+.codex-finalizer/
+.codex-finalizer

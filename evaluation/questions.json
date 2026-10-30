@@ -1,0 +1,107 @@
+[
+  {
+    "id": "q1",
+    "type": "EXACT_SYMBOL",
+    "question": "Where is the JwtFilter class defined?",
+    "expectedFiles": ["JwtFilter.java"],
+    "expectedSymbols": ["JwtFilter"]
+  },
+  {
+    "id": "q2",
+    "type": "EXACT_SYMBOL",
+    "question": "Find the definition of GitHubUrlValidator",
+    "expectedFiles": ["GitHubUrlValidator.java"],
+    "expectedSymbols": ["GitHubUrlValidator", "validateAndNormalize"]
+  },
+  {
+    "id": "q3",
+    "type": "EXACT_SYMBOL",
+    "question": "Where is the QdrantConfig class located?",
+    "expectedFiles": ["QdrantConfig.java"],
+    "expectedSymbols": ["QdrantConfig", "qdrantClient"]
+  },
+  {
+    "id": "q4",
+    "type": "EXACT_SYMBOL",
+    "question": "Where is the GenericTextChunker defined?",
+    "expectedFiles": ["GenericTextChunker.java"],
+    "expectedSymbols": ["GenericTextChunker", "chunkText"]
+  },
+  {
+    "id": "q5",
+    "type": "CONCEPTUAL",
+    "question": "How does the project parse Java code compared to other file types?",
+    "expectedFiles": ["CodeParser.java", "JavaCodeParser.java", "GenericTextChunker.java"],
+    "expectedSymbols": ["CodeParser", "JavaCodeParser", "parseFile"]
+  },
+  {
+    "id": "q6",
+    "type": "CONCEPTUAL",
+    "question": "How are files filtered during repository discovery to skip build outputs and secrets?",
+    "expectedFiles": ["FileDiscoveryService.java"],
+    "expectedSymbols": ["FileDiscoveryService", "discoverFiles"]
+  },
+  {
+    "id": "q7",
+    "type": "CONCEPTUAL",
+    "question": "How does the vector indexing service create Qdrant collections and batch upserts?",
+    "expectedFiles": ["VectorIndexService.java", "EmbeddingService.java"],
+    "expectedSymbols": ["VectorIndexService", "upsertChunks", "ensureCollectionExists"]
+  },
+  {
+    "id": "q8",
+    "type": "CONCEPTUAL",
+    "question": "How are repository indexing states tracked across threads in memory?",
+    "expectedFiles": ["RepositoryStateStore.java", "RepositoryStatus.java"],
+    "expectedSymbols": ["RepositoryStateStore", "RepositoryRecord"]
+  },
+  {
+    "id": "q9",
+    "type": "PATH_TRACING",
+    "question": "Trace the execution path for submitting a repository for indexing from REST controller to background job.",
+    "expectedFiles": ["RepositoryController.java", "IndexingService.java", "GitCloneService.java"],
+    "expectedSymbols": ["registerRepository", "startIndexingAsync", "cloneRepository"]
+  },
+  {
+    "id": "q10",
+    "type": "PATH_TRACING",
+    "question": "Trace how a semantic search request is processed from controller to Qdrant vector retrieval.",
+    "expectedFiles": ["SearchController.java", "EmbeddingService.java", "VectorIndexService.java"],
+    "expectedSymbols": ["searchCode", "embedQuery", "search"]
+  },
+  {
+    "id": "q11",
+    "type": "PATH_TRACING",
+    "question": "Trace how the /ask endpoint processes questions, retrieves context, and verifies citations.",
+    "expectedFiles": ["AskController.java", "AnswerService.java", "ContextAssembler.java", "CitationValidator.java"],
+    "expectedSymbols": ["askQuestion", "answerQuestion", "validateCitations"]
+  },
+  {
+    "id": "q12",
+    "type": "NEGATIVE_UNANSWERABLE",
+    "question": "Where is the Stripe payment gateway webhook handler configured?",
+    "expectedFiles": [],
+    "expectedSymbols": []
+  },
+  {
+    "id": "q13",
+    "type": "NEGATIVE_UNANSWERABLE",
+    "question": "Where is the Redis cache eviction policy configured in this project?",
+    "expectedFiles": [],
+    "expectedSymbols": []
+  },
+  {
+    "id": "q14",
+    "type": "NEGATIVE_UNANSWERABLE",
+    "question": "Where are the Kubernetes Helm charts and deployment manifests stored?",
+    "expectedFiles": [],
+    "expectedSymbols": []
+  },
+  {
+    "id": "q15",
+    "type": "NEGATIVE_UNANSWERABLE",
+    "question": "Show the React frontend components for the login page.",
+    "expectedFiles": [],
+    "expectedSymbols": []
+  }
+]
