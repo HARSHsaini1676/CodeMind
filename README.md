@@ -35,11 +35,11 @@ PostgreSQL State Store       RetrievalService              AnswerService
 Indexing Pipeline                   v                    CitationValidator
 (Git Clone -> Filter ->      RerankingService        (Server Verified Citations)
  AST & Markdown Chunking ->  (Stage 2: Cross-Encoder             │
- Batch Embeddings)             Jina AI / Fallback)               │
-       │                            │                            │
-       v                            v                            v
- Qdrant Upsert               Ranked Code Candidates       Grounded Answer
-                          (Highest Relevance First)   with Real Line Numbers
+ Batch Embeddings via          Jina AI / Fallback)               │
+ Jina AI Embeddings v3)             │                            │
+       │                            v                            v
+       v                 Ranked Code Candidates       Grounded Answer
+ Qdrant Upsert            (Highest Relevance First)   with Real Line Numbers
 ```
 
 ### Core Design Principles
@@ -60,6 +60,7 @@ Indexing Pipeline                   v                    CitationValidator
 - **Runtime & Language**: Java 21 / Spring Boot 4.1.2
 - **Persistence**: Spring Data JPA & PostgreSQL Driver
 - **AI Integration**: Spring AI (OpenAI, SenseNova, Groq, Ollama compatible)
+- **Embedding Model**: Jina AI Embeddings (`jina-embeddings-v3`, 1024 dims)
 - **Reranker API**: Jina AI Rerank API (`jina-reranker-v2-base-multilingual`)
 - **Vector Database**: Qdrant (gRPC port `6334` / HTTP port `6333`)
 - **Code Parser**: JavaParser 3.26.3
@@ -98,10 +99,12 @@ spring.ai.openai.api-key=your-api-key-here
 spring.ai.openai.base-url=https://api.openai.com
 spring.ai.openai.chat.model=gpt-4o-mini
 
-# Embeddings Provider (Ollama or OpenAI)
-spring.ai.model.embedding=ollama
-spring.ai.ollama.base-url=http://localhost:11434
-spring.ai.ollama.embedding.model=nomic-embed-text
+# Jina Embeddings (OpenAI-compatible) configuration
+spring.ai.model.embedding=openai
+spring.ai.openai.embedding.base-url=https://api.jina.ai/v1
+spring.ai.openai.embedding.api-key=your-jina-api-key-here
+spring.ai.openai.embedding.model=jina-embeddings-v3
+spring.ai.openai.embedding.dimensions=1024
 
 # Cross-Encoder Reranker (Jina AI - Optional, falls back to RRF if blank)
 codemind.rerank.enabled=true
@@ -284,6 +287,8 @@ CodeMind/
 │   │   │   ├── ingestion/                    # URL validation, Git clone, file discovery, IndexingService
 │   │   │   ├── parsing/                      # JavaParser AST, MarkdownChunker & fallback text chunkers
 │   │   │   ├── indexing/                     # Vector embeddings & Qdrant upsert/search
+│   │   │   │   ├── EmbeddingService.java     # Jina AI / Spring AI vector generation
+│   │   │   │   └── VectorIndexService.java   # Qdrant upsert and hybrid scroll/search
 │   │   │   ├── retrieval/                    # Two-stage retrieval: RRF Hybrid, Jina Reranking, ContextAssembler
 │   │   │   │   ├── RetrievalService.java     # Orchestrates Stage 1 RRF & Stage 2 Reranking
 │   │   │   │   ├── RerankingService.java     # Pluggable reranking contract

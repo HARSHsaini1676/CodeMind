@@ -62,9 +62,15 @@ public class EmbeddingService {
     }
 
     /**
-     * Returns the vector dimension size (e.g. 1536 for text-embedding-3-small).
+     * Returns the vector dimension size (e.g. 1024 for jina-embeddings-v3).
+     * Defaults to 1024 if dynamic probing fails.
      */
     public int getDimensions() {
-        return embeddingModel.dimensions();
+        try {
+            return embeddingModel.dimensions();
+        } catch (Exception e) {
+            log.warn("Failed to dynamically detect embedding dimensions: {}. Defaulting to 1024.", e.getMessage());
+            return 1024;
+        }
     }
 }
