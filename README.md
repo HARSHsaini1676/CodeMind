@@ -9,7 +9,7 @@
 
 CodeMind is a high-performance backend AI service that helps developers quickly comprehend and navigate unfamiliar GitHub repositories. A user submits a public GitHub repository URL; CodeMind safely clones it into an isolated temporary workspace, discovers and filters candidate files, parses Java files into semantic AST units (classes, constructors, methods), sections Markdown documentation, generates vector embeddings, and stores them in Qdrant.
 
-Developers can then run **hybrid code search** (combining exact symbol/path matching and semantic vectors via **Reciprocal Rank Fusion**) and ask natural-language questions with **server-verified file and line citations** or stream responses in real-time via Server-Sent Events (SSE).
+Developers can then run **two-stage hybrid code search** (combining exact symbol/path matching, semantic vectors via **Reciprocal Rank Fusion**, and neural **cross-encoder reranking** via Jina AI) and ask natural-language questions with **server-verified file and line citations** or stream responses in real-time via Server-Sent Events (SSE).
 
 ---
 
@@ -29,25 +29,27 @@ Developers can then run **hybrid code search** (combining exact symbol/path matc
        │                            │                            │
        v                            v                            v
 PostgreSQL State Store       RetrievalService              AnswerService
-(Durable Persistence)     (RRF Hybrid: Symbol/Path)       (Spring AI ChatModel)
+(Durable Persistence)     (Stage 1: RRF Hybrid Retrieval   (Spring AI ChatModel)
+       │                   Exact Symbol/Path + Vectors)          │
+       v                            │                            v
+Indexing Pipeline                   v                    CitationValidator
+(Git Clone -> Filter ->      RerankingService        (Server Verified Citations)
+ AST & Markdown Chunking ->  (Stage 2: Cross-Encoder             │
+ Batch Embeddings)             Jina AI / Fallback)               │
        │                            │                            │
        v                            v                            v
-Indexing Pipeline              Qdrant Store              CitationValidator
-(Git Clone -> Filter ->     (Vectors + Payloads)       (Server Verified Citations)
- AST & Markdown Chunking ->         │                            │
- Batch Embeddings)                  └────────────────────────────┘
-       │                                                         │
-       v                                                         v
- Qdrant Upsert                                           Grounded Answer
-                                                       with Real Line Numbers
+ Qdrant Upsert               Ranked Code Candidates       Grounded Answer
+                          (Highest Relevance First)   with Real Line Numbers
 ```
 
 ### Core Design Principles
 1. **Safety First**: Repository source code is strictly data to be indexed, **NEVER executed**. No build tools (`mvn`, `gradle`, `npm`) or repository scripts are ever executed. Git cloning is isolated via `ProcessBuilder` without shell interpolation.
 2. **Structure-Aware AST & Section Chunking**: Java files are parsed into semantic units (classes, methods, constructors) using `JavaParser`, preserving exact 1-indexed source line numbers. Markdown documentation is sectioned along header boundaries (`#`, `##`, `###`). Other text files use windowed text chunking.
 3. **No Hallucinated Citations**: The server is the ultimate authority on citations. Chunk IDs emitted by the LLM are cross-referenced server-side against actual retrieved chunks. Hallucinations are discarded.
-4. **Hybrid Retrieval with Reciprocal Rank Fusion (RRF)**: Combines exact keyword matching (symbols and file paths) with cosine semantic vector search:
-   $$\text{RRF Score}(d) = \frac{1}{60 + \text{rank}_{\text{keyword}}(d)} + \frac{1}{60 + \text{rank}_{\text{vector}}(d)}$$
+4. **Two-Stage Retrieval Pipeline**:
+   - **Stage 1 (Candidate Generation - RRF Hybrid Search)**: Combines exact keyword matching (symbols and file paths) with cosine semantic vector search:
+     $$\text{RRF Score}(d) = \frac{1}{60 + \text{rank}_{\text{keyword}}(d)} + \frac{1}{60 + \text{rank}_{\text{vector}}(d)}$$
+   - **Stage 2 (Cross-Encoder Reranking)**: Employs a dedicated cross-encoder (`jina-reranker-v2-base-multilingual`) via `RerankingService` to compute direct query-to-code relevance scores, with an automatic zero-overhead fallback to RRF if disabled or unconfigured.
 5. **Durable Persistence**: Repository metadata, commit SHAs, file counts, chunk counts, and indexing lifecycles are persisted in **PostgreSQL**, surviving application restarts.
 6. **Real-Time Token Streaming**: Supports Server-Sent Events (`text/event-stream`) streaming tokens directly to the client as they are generated.
 
@@ -58,6 +60,7 @@ Indexing Pipeline              Qdrant Store              CitationValidator
 - **Runtime & Language**: Java 21 / Spring Boot 4.1.2
 - **Persistence**: Spring Data JPA & PostgreSQL Driver
 - **AI Integration**: Spring AI (OpenAI, SenseNova, Groq, Ollama compatible)
+- **Reranker API**: Jina AI Rerank API (`jina-reranker-v2-base-multilingual`)
 - **Vector Database**: Qdrant (gRPC port `6334` / HTTP port `6333`)
 - **Code Parser**: JavaParser 3.26.3
 - **Documentation**: Springdoc OpenAPI / Swagger UI 2.8.5
@@ -99,6 +102,12 @@ spring.ai.openai.chat.model=gpt-4o-mini
 spring.ai.model.embedding=ollama
 spring.ai.ollama.base-url=http://localhost:11434
 spring.ai.ollama.embedding.model=nomic-embed-text
+
+# Cross-Encoder Reranker (Jina AI - Optional, falls back to RRF if blank)
+codemind.rerank.enabled=true
+codemind.rerank.api-key=your-jina-api-key-here
+codemind.rerank.model=jina-reranker-v2-base-multilingual
+codemind.rerank.candidate-multiplier=3
 ```
 
 ### Running the Application
@@ -163,8 +172,8 @@ Poll the background indexing progress until status reaches `READY` (or `FAILED`)
 
 ---
 
-### 3. Code Search (Hybrid Symbol, Path & Semantic Retrieval)
-Retrieves ranked code snippets matching a query, exact symbol, or file path using Reciprocal Rank Fusion.
+### 3. Code Search (Two-Stage Hybrid & Reranked Retrieval)
+Retrieves precision-ranked code snippets matching a query, exact symbol, or file path using Reciprocal Rank Fusion followed by cross-encoder reranking.
 
 - **Endpoint**: `POST /api/v1/repositories/{id}/search`
 - **Request**:
@@ -183,7 +192,7 @@ Retrieves ranked code snippets matching a query, exact symbol, or file path usin
         "startLine": 1,
         "endLine": 12,
         "symbolName": "Overview",
-        "score": 0.0328,
+        "score": 0.892,
         "snippet": "# Hello World\nThis repository provides a minimal hello-world example."
       }
     ]
@@ -275,7 +284,11 @@ CodeMind/
 │   │   │   ├── ingestion/                    # URL validation, Git clone, file discovery, IndexingService
 │   │   │   ├── parsing/                      # JavaParser AST, MarkdownChunker & fallback text chunkers
 │   │   │   ├── indexing/                     # Vector embeddings & Qdrant upsert/search
-│   │   │   ├── retrieval/                    # RetrievalService (RRF hybrid) & ContextAssembler
+│   │   │   ├── retrieval/                    # Two-stage retrieval: RRF Hybrid, Jina Reranking, ContextAssembler
+│   │   │   │   ├── RetrievalService.java     # Orchestrates Stage 1 RRF & Stage 2 Reranking
+│   │   │   │   ├── RerankingService.java     # Pluggable reranking contract
+│   │   │   │   ├── JinaRerankingService.java # Cross-encoder reranker via Jina AI
+│   │   │   │   └── ContextAssembler.java     # Code context prompt builder
 │   │   │   ├── answering/                    # AnswerService & CitationValidator
 │   │   │   └── common/                       # Exceptions & shared utilities
 │   │   └── resources/

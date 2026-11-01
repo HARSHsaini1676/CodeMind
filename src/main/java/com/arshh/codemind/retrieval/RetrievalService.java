@@ -1,5 +1,6 @@
 package com.arshh.codemind.retrieval;
 
+import com.arshh.codemind.config.CodeMindProperties;
 import com.arshh.codemind.dto.SearchResult;
 import com.arshh.codemind.indexing.EmbeddingService;
 import com.arshh.codemind.indexing.VectorIndexService;
@@ -16,7 +17,7 @@ import java.util.regex.Pattern;
 
 /**
  * Hybrid retrieval service combining exact symbol lookup, file path matching, and semantic vector search.
- * Merges results using Reciprocal Rank Fusion (RRF) for balanced, highly accurate code ranking.
+ * Merges results using Reciprocal Rank Fusion (RRF), followed by an optional cross-encoder reranking pass.
  */
 @Service
 public class RetrievalService {
@@ -34,19 +35,31 @@ public class RetrievalService {
 
     private final EmbeddingService embeddingService;
     private final VectorIndexService vectorIndexService;
+    private final RerankingService rerankingService;
+    private final CodeMindProperties properties;
 
-    public RetrievalService(EmbeddingService embeddingService, VectorIndexService vectorIndexService) {
+    public RetrievalService(
+            EmbeddingService embeddingService,
+            VectorIndexService vectorIndexService,
+            RerankingService rerankingService,
+            CodeMindProperties properties) {
         this.embeddingService = embeddingService;
         this.vectorIndexService = vectorIndexService;
+        this.rerankingService = rerankingService;
+        this.properties = properties;
     }
 
     /**
-     * Executes hybrid retrieval combining exact keyword matches (symbols + paths) with semantic vector search via RRF.
+     * Executes hybrid retrieval combining exact keyword matches (symbols + paths) with semantic vector search via RRF,
+     * then refines candidate ordering using a cross-encoder reranker.
      */
     public List<SearchResult> retrieve(String repositoryId, String query, int topK) {
         // Map to collect and merge candidate chunks by chunkId
         Map<String, SearchResult> candidates = new HashMap<>();
         Map<String, Double> rrfScores = new HashMap<>();
+
+        // Multiplier controls how wide of a candidate pool we fetch before reranking
+        int candidatePoolSize = topK * Math.max(1, properties.getRerank().getCandidateMultiplier());
 
         // List 1: Exact Keyword matches (Symbols + File Paths)
         List<SearchResult> keywordMatches = new ArrayList<>();
@@ -75,7 +88,7 @@ public class RetrievalService {
 
         // List 2: Semantic vector search
         float[] queryVector = embeddingService.embedQuery(query);
-        List<SearchResult> vectorMatches = vectorIndexService.search(repositoryId, queryVector, topK * 2);
+        List<SearchResult> vectorMatches = vectorIndexService.search(repositoryId, queryVector, candidatePoolSize);
 
         // Apply RRF score for semantic vector ranked list
         for (int rank = 0; rank < vectorMatches.size(); rank++) {
@@ -86,28 +99,25 @@ public class RetrievalService {
         }
 
         // Sort all candidates by descending RRF score
-        List<SearchResult> rankedResults = new ArrayList<>();
-        candidates.values().stream()
+        List<SearchResult> rrfRankedCandidates = candidates.values().stream()
                 .sorted((a, b) -> Double.compare(
                         rrfScores.getOrDefault(b.chunkId(), 0.0),
                         rrfScores.getOrDefault(a.chunkId(), 0.0)
                 ))
-                .limit(topK)
-                .forEach(chunk -> {
-                    // Attach normalized RRF score
-                    float fusedScore = rrfScores.getOrDefault(chunk.chunkId(), 0.0).floatValue();
-                    rankedResults.add(new SearchResult(
-                            chunk.chunkId(),
-                            chunk.path(),
-                            chunk.startLine(),
-                            chunk.endLine(),
-                            chunk.symbolName(),
-                            fusedScore,
-                            chunk.snippet()
-                    ));
-                });
+                .limit(candidatePoolSize)
+                .map(chunk -> new SearchResult(
+                        chunk.chunkId(),
+                        chunk.path(),
+                        chunk.startLine(),
+                        chunk.endLine(),
+                        chunk.symbolName(),
+                        rrfScores.getOrDefault(chunk.chunkId(), 0.0).floatValue(),
+                        chunk.snippet()
+                ))
+                .toList();
 
-        return rankedResults;
+        // Stage 2: Cross-encoder reranking pass
+        return rerankingService.rerank(query, rrfRankedCandidates, topK);
     }
 
     private List<String> extractPotentialSymbols(String query) {

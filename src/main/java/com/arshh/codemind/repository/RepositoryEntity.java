@@ -67,30 +67,75 @@ public class RepositoryEntity {
         this.updatedAt = LocalDateTime.now();
     }
 
-    public String getRepositoryId() { return repositoryId; }
-    public void setRepositoryId(String repositoryId) { this.repositoryId = repositoryId; }
+    public String getRepositoryId() {
+        return repositoryId;
+    }
 
-    public String getGithubUrl() { return githubUrl; }
-    public void setGithubUrl(String githubUrl) { this.githubUrl = githubUrl; }
+    public void setRepositoryId(String repositoryId) {
+        this.repositoryId = repositoryId;
+    }
 
-    public RepositoryStatus getStatus() { return status; }
-    public void setStatus(RepositoryStatus status) { this.status = status; }
+    public String getGithubUrl() {
+        return githubUrl;
+    }
 
-    public String getCommitSha() { return commitSha; }
-    public void setCommitSha(String commitSha) { this.commitSha = commitSha; }
+    public void setGithubUrl(String githubUrl) {
+        this.githubUrl = githubUrl;
+    }
 
-    public int getFileCount() { return fileCount; }
-    public void setFileCount(int fileCount) { this.fileCount = fileCount; }
+    public RepositoryStatus getStatus() {
+        return status;
+    }
 
-    public int getChunkCount() { return chunkCount; }
-    public void setChunkCount(int chunkCount) { this.chunkCount = chunkCount; }
+    public void setStatus(RepositoryStatus status) {
+        this.status = status;
+    }
 
-    public String getErrorMessage() { return errorMessage; }
-    public void setErrorMessage(String errorMessage) { this.errorMessage = errorMessage; }
+    public String getCommitSha() {
+        return commitSha;
+    }
 
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public void setCommitSha(String commitSha) {
+        this.commitSha = commitSha;
+    }
 
-    public LocalDateTime getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public int getFileCount() {
+        return fileCount;
+    }
+
+    public void setFileCount(int fileCount) {
+        this.fileCount = fileCount;
+    }
+
+    public int getChunkCount() {
+        return chunkCount;
+    }
+
+    public void setChunkCount(int chunkCount) {
+        this.chunkCount = chunkCount;
+    }
+
+    public String getErrorMessage() {
+        return errorMessage;
+    }
+
+    public void setErrorMessage(String errorMessage) {
+        this.errorMessage = errorMessage;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
 }
