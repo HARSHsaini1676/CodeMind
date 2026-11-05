@@ -40,6 +40,10 @@ temp-repos/
 logs/
 *.log
 
+### Application Properties (Secrets & Local Configuration) ###
+src/main/resources/application.properties
+application.properties
+
 ### Agent Governance, Documentation & Workspaces (Ignored from remote) ###
 decision.md
 flow.md
